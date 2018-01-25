@@ -20,6 +20,12 @@
     <script>
         function start_long_task() {
             // add task status elements
+            // div class='progress'     div[0]
+            //    div Nanobar           .childNodes[0]
+            //    div 0%                .childNodes[1]
+            //    div ... or status     .childNodes[2]  doing something long...
+            //    div &nbsp             .childNodes[3]   Result: blah
+            //
             div = $('<div class="progress"><div></div><div>0%</div><div>...</div><div>&nbsp;</div></div><hr>');
             $('#progress').append(div);
             // create a progress bar
@@ -27,12 +33,21 @@
                 bg: '#44f',
                 target: div[0].childNodes[0]
             });
+
+
             // send ajax POST request to start background job
             $.ajax({
                 type: 'POST',
                 url: '/longtask',
                 success: function(data, status, request) {
                     status_url = request.getResponseHeader('Location');
+
+                    // set cancel button
+                    task_id = request.getResponseHeader('task_id');
+                    $(div[0].childNodes[3]).html("<button id='canceltaskbtn'>Cancel</button>");
+                    $('#canceltaskbtn').click(function() { kill_task(task_id) });
+
+                    // get status and let this call itself until completed
                     update_progress(status_url, nanobar, div[0]);
                 },
                 error: function() {
@@ -40,6 +55,23 @@
                 }
             });
         }
+
+        function kill_task(task_id) {
+            // kill task
+            //alert('Killing task ' + task_id);
+            $.ajax({
+              type: 'GET',
+              url: '/killtask/' + task_id,
+              success: function(data, status, request) {
+                // alert('Successfully killed task');
+                $(div[0].childNodes[3]).text("KILLED");
+              },
+              error: function() {
+                alert('Unexpected error');
+              }
+            })
+        }
+
         function update_progress(status_url, nanobar, status_div) {
             // send GET request to status URL
             $.getJSON(status_url, function(data) {
@@ -62,7 +94,7 @@
                     // rerun after delay
                     setTimeout(function() {
                         update_progress(status_url, nanobar, status_div);
-                    }, 300);
+                    }, 2000);
                 }
             });
         }
